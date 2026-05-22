@@ -12,3 +12,5 @@ opencv-python-headless==4.9.0.80
 numpy==1.26.3
 python-dotenv==1.0.0
 pydantic==2.5.3
+python-json-logger==2.0.7
+
