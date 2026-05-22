@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AI-integrated automated Parking Management System. Real-time slot tracking, revenue auditing, dynamic slot configuration, and manual overrides.">
+    <title>Automated Parking Management Dashboard</title>
+    <!-- Google Fonts & FontAwesome for Premium Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Local Premium Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="glass-bg-container">
+        <!-- Floating Ambient Background Blobs for Glassmorphic Depth -->
+        <div class="blob blob-purple"></div>
+        <div class="blob blob-blue"></div>
+        <div class="blob blob-cyan"></div>
+
+        <div class="app-container">
+            <!-- Header Section -->
+            <header class="app-header">
+                <div class="header-logo">
+                    <i class="fa-solid fa-square-parking parking-icon-pulse"></i>
+                    <div>
+                        <h1 id="dashboard-title">SPARK</h1>
+                        <p class="subtitle">Automated Parking Management System</p>
+                    </div>
+                </div>
+                
+                <div class="header-controls">
+                    <!-- User Session Profile -->
+                    <div id="user-profile-header" class="user-profile-header hidden">
+                        <i class="fa-solid fa-user-circle"></i>
+                        <div class="user-info">
+                            <span id="user-display-name">Guest</span>
+                            <span id="user-display-role" class="role-badge">viewer</span>
+                        </div>
+                        <button id="logout-btn" class="secondary-btn btn-sm" onclick="logoutUser()">
+                            <i class="fa-solid fa-right-from-bracket"></i> Logout
+                        </button>
+                    </div>
+                    <!-- API Security Key config -->
+                    <div class="api-key-config">
+                        <i class="fa-solid fa-key"></i>
+                        <input type="password" id="api-key-input" placeholder="Enter API Key" value="secret_parking_key_2026" title="API Key for secure requests">
+                    </div>
+                    <!-- WebSocket connection status dot -->
+                    <div id="ws-status" class="ws-status offline">
+                        <span class="status-dot"></span>
+                        <span id="ws-status-text">Connecting...</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main Layout Grid -->
+            <main class="dashboard-grid">
+                
+                <!-- Left Sidebar: Analytics, Manual Override & Configs -->
+                <section class="sidebar-section">
+                    
+                    <!-- 1. Key Metrics & Capacity Tracker -->
+                    <div class="glass-card metrics-card">
+                        <h2><i class="fa-solid fa-chart-simple"></i> System Status</h2>
+                        <div id="lot-full-alert" class="lot-full-banner hidden">
+                            <i class="fa-solid fa-triangle-exclamation"></i> PARKING LOT FULL
+                        </div>
+                        <div class="capacity-bar-container">
+                            <div class="capacity-bar-labels">
+                                <span>Occupancy Rate</span>
+                                <span id="occupancy-percentage">0%</span>
+                            </div>
+                            <div class="progress-track">
+                                <div id="occupancy-progress-bar" class="progress-bar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="capacity-stats">
+                            <div class="stat-box">
+                                <span class="stat-val" id="total-slots-count">0</span>
+                                <span class="stat-lbl">Total Slots</span>
+                            </div>
+                            <div class="stat-box available">
+                                <span class="stat-val" id="available-slots-count">0</span>
+                                <span class="stat-lbl">Available</span>
+                            </div>
+                            <div class="stat-box occupied">
+                                <span class="stat-val" id="occupied-slots-count">0</span>
+                                <span class="stat-lbl">Occupied</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. Revenue Tracker Panel -->
+                    <div class="glass-card revenue-card">
+                        <h2><i class="fa-solid fa-indian-rupee-sign"></i> Earnings Dashboard</h2>
+                        <div class="revenue-grid">
+                            <div class="revenue-box">
+                                <span class="rev-lbl">Today</span>
+                                <span class="rev-val" id="revenue-daily">₹0.00</span>
+                            </div>
+                            <div class="revenue-box">
+                                <span class="rev-lbl">This Week</span>
+                                <span class="rev-val" id="revenue-weekly">₹0.00</span>
+                            </div>
+                            <div class="revenue-box">
+                                <span class="rev-lbl">This Month</span>
+                                <span class="rev-val" id="revenue-monthly">₹0.00</span>
+                            </div>
+                            <div class="revenue-box highlighted">
+                                <span class="rev-lbl">Lifetime</span>
+                                <span class="rev-val" id="revenue-lifetime">₹0.00</span>
+                            </div>
+                        </div>
+                        <button id="refresh-revenue-btn" class="secondary-btn btn-sm">
+                            <i class="fa-solid fa-arrows-rotate"></i> Refresh Earnings
+                        </button>
+                    </div>
+
+                    <!-- 3. Manual Override (OCR Fallback Control Gate) -->
+                    <div class="glass-card override-card">
+                        <h2><i class="fa-solid fa-door-open"></i> Gate Manual Override</h2>
+                        <div class="form-tabs">
+                            <button id="tab-entry-btn" class="tab-btn active" onclick="switchOverrideTab('entry')">Entry</button>
+                            <button id="tab-exit-btn" class="tab-btn" onclick="switchOverrideTab('exit')">Exit</button>
+                            <button id="tab-reserve-btn" class="tab-btn" onclick="switchOverrideTab('reserve')">Reserve</button>
+                        </div>
+                        
+                        <div id="manual-entry-form" class="override-form">
+                            <div class="input-group">
+                                <label for="manual-entry-plate">License Plate Number</label>
+                                <input type="text" id="manual-entry-plate" placeholder="e.g. MH12AB1234" uppercase>
+                            </div>
+                            <div class="input-group">
+                                <label for="manual-entry-type">Vehicle Type</label>
+                                <select id="manual-entry-type" class="glass-select">
+                                    <option value="STANDARD" selected>Standard Vehicle</option>
+                                    <option value="VIP">VIP Member (20% off)</option>
+                                    <option value="EV">Electric Vehicle (Surge Charging)</option>
+                                    <option value="OVERSIZED">Oversized / SUV (50% extra)</option>
+                                </select>
+                            </div>
+                            <button id="trigger-manual-entry-btn" class="primary-btn btn-full">
+                                <i class="fa-solid fa-arrow-right-to-bracket"></i> Enter Lot
+                            </button>
+                        </div>
+
+                        <div id="manual-exit-form" class="override-form hidden">
+                            <div class="input-group">
+                                <label for="manual-exit-plate">License Plate Number</label>
+                                <div class="input-with-btn">
+                                    <input type="text" id="manual-exit-plate" placeholder="e.g. MH12AB1234" uppercase>
+                                    <button id="trigger-manual-exit-btn" class="primary-btn warning-theme">
+                                        <i class="fa-solid fa-arrow-right-from-bracket"></i> Process Exit
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="manual-reserve-form" class="override-form hidden">
+                            <div class="input-group">
+                                <label for="manual-reserve-slot">Slot Name</label>
+                                <input type="text" id="manual-reserve-slot" placeholder="e.g. VIP 1">
+                            </div>
+                            <div class="input-group">
+                                <label for="manual-reserve-plate">License Plate Number</label>
+                                <input type="text" id="manual-reserve-plate" placeholder="e.g. MH12AB1234" uppercase>
+                            </div>
+                            <div class="input-group">
+                                <label for="manual-reserve-duration">Duration (minutes)</label>
+                                <input type="number" id="manual-reserve-duration" value="30" min="1">
+                            </div>
+                            <button id="trigger-manual-reserve-btn" class="primary-btn btn-full" onclick="executeManualReserve()">
+                                <i class="fa-solid fa-calendar-check"></i> Confirm Reservation
+                            </button>
+                        </div>
+                        <div id="override-status-message" class="feedback-msg hidden"></div>
+                    </div>
+
+                    <!-- 4. Dynamic Pricing Configuration -->
+                    <div class="glass-card pricing-card">
+                        <h2><i class="fa-solid fa-gears"></i> Dynamic Rate Settings</h2>
+                        <form id="pricing-config-form">
+                            <div class="input-row">
+                                <div class="input-group-half">
+                                    <label for="price-rule-name">Rule Name</label>
+                                    <input type="text" id="price-rule-name" value="Standard Campus Rate" required>
+                                </div>
+                                <div class="input-group-half">
+                                    <label for="price-free-mins">Free Minutes</label>
+                                    <input type="number" id="price-free-mins" value="15" min="0" required>
+                                </div>
+                            </div>
+                            <div class="input-row">
+                                <div class="input-group-third">
+                                    <label for="price-base-fee">Base Fee (₹)</label>
+                                    <input type="number" id="price-base-fee" value="40" min="0" step="0.01" required>
+                                </div>
+                                <div class="input-group-third">
+                                    <label for="price-base-hours">Base Hours</label>
+                                    <input type="number" id="price-base-hours" value="2" min="1" required>
+                                </div>
+                                <div class="input-group-third">
+                                    <label for="price-hourly-rate">Hourly Rate (₹)</label>
+                                    <input type="number" id="price-hourly-rate" value="20" min="0" step="0.01" required>
+                                </div>
+                            </div>
+                            <button type="submit" id="save-pricing-btn" class="primary-btn btn-full">
+                                <i class="fa-solid fa-floppy-disk"></i> Apply Pricing Rule
+                            </button>
+                        </form>
+                    </div>
+
+                </section>
+
+                <!-- Center/Right Panel: Parking Grid Map, Logs, Configurations -->
+                <section class="main-content-section">
+                    
+                    <!-- 5. Real-Time Slot Visualizer Map Grid -->
+                    <div class="glass-card slots-grid-card">
+                        <div class="card-header-flex">
+                            <h2><i class="fa-solid fa-grip"></i> Real-Time Parking Grid</h2>
+                            <button id="add-slot-toggle-btn" class="secondary-btn btn-sm" onclick="toggleAddSlotPanel()">
+                                <i class="fa-solid fa-plus"></i> Configure Slot
+                            </button>
+                        </div>
+
+                        <!-- Expandable add slot panel -->
+                        <div id="add-slot-panel" class="slot-management-panel hidden">
+                            <div class="panel-inner">
+                                <input type="text" id="new-slot-name-input" placeholder="Enter Slot Name (e.g. VIP 3, Slot B1)">
+                                <select id="new-slot-type-select" class="glass-select" style="max-width: 120px; margin-right: 10px;">
+                                    <option value="STANDARD" selected>Standard</option>
+                                    <option value="VIP">VIP</option>
+                                    <option value="DISABLED">Disabled</option>
+                                </select>
+                                <button id="add-slot-submit-btn" class="primary-btn btn-sm" onclick="submitNewSlot()">
+                                    Create Slot
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Parking Grid Container -->
+                        <div id="parking-slots-grid" class="parking-grid">
+                            <!-- Dynamically filled with JS -->
+                            <div class="grid-skeleton">Loading Parking Grid Map...</div>
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Pricing Forecast Card -->
+                    <div class="glass-card pricing-forecast-card">
+                        <div class="card-header-flex">
+                            <h2><i class="fa-solid fa-chart-line"></i> Dynamic Pricing Rate Forecast</h2>
+                            <span id="current-live-rate" class="rate-badge">Current Rate: ₹20.00/hr</span>
+                        </div>
+                        <div class="chart-container" style="position: relative; height:180px; width:100%; margin-top: 15px;">
+                            <canvas id="pricingForecastChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- 6. Real-time Live Gate Camera Logs (WebSocket Stream) -->
+                    <div class="glass-card live-feed-card">
+                        <h2><i class="fa-solid fa-video"></i> Live Camera Activity Log</h2>
+                        <div class="log-stream-container">
+                            <ul id="live-camera-events" class="event-list">
+                                <li class="event-placeholder">Waiting for vehicle scanning activity...</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- 7. Historical Audit Log Search -->
+                    <div class="glass-card historical-card">
+                        <div class="card-header-flex">
+                            <h2><i class="fa-solid fa-magnifying-glass"></i> Security & Audit Queries</h2>
+                            <div class="integrity-checker">
+                                <span id="audit-integrity-badge" class="integrity-badge unknown">
+                                    <i class="fa-solid fa-shield-halved"></i> Integrity: Unknown
+                                </span>
+                                <button id="verify-audit-btn" class="secondary-btn btn-sm" onclick="verifyAuditLogs()">
+                                    <i class="fa-solid fa-arrows-rotate"></i> Verify Chain
+                                </button>
+                            </div>
+                        </div>
+                        <div class="search-filters">
+                            <div class="filter-group">
+                                <label for="search-plate">License Plate</label>
+                                <input type="text" id="search-plate" placeholder="Search vehicle...">
+                            </div>
+                            <div class="filter-group">
+                                <label for="search-slot">Parking Slot</label>
+                                <input type="text" id="search-slot" placeholder="Search slot...">
+                            </div>
+                            <div class="filter-group">
+                                <label for="search-start-date">Start Date</label>
+                                <input type="datetime-local" id="search-start-date">
+                            </div>
+                            <div class="filter-group">
+                                <label for="search-end-date">End Date</label>
+                                <input type="datetime-local" id="search-end-date">
+                            </div>
+                            <button id="search-logs-btn" class="primary-btn search-btn-offset">
+                                <i class="fa-solid fa-search"></i> Run Audit Query
+                            </button>
+                        </div>
+
+                        <!-- Search results table wrapper -->
+                        <div class="table-container">
+                            <table id="audit-results-table">
+                                <thead>
+                                    <tr>
+                                        <th>Vehicle Plate</th>
+                                        <th>Parking Slot</th>
+                                        <th>Entry Timestamp</th>
+                                        <th>Exit Timestamp</th>
+                                        <th>Duration</th>
+                                        <th>Charged Fee</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="audit-results-body">
+                                    <tr>
+                                        <td colspan="7" class="table-placeholder">Run an audit query above to display records.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </section>
+
+                <!-- Alerts Sidebar Panel -->
+                <section class="alerts-sidebar-section">
+                    <div class="glass-card alerts-sidebar-card">
+                        <h2><i class="fa-solid fa-bell text-danger-color"></i> Live Alerts</h2>
+                        <div class="alerts-container">
+                            <ul id="alerts-sidebar-list" class="alert-list">
+                                <li class="alert-placeholder">No active system alerts.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+                
+            </main>
+        </div>
+    </div>
+
+    <!-- Edit Slot Dialog Modal (Micro-interaction) -->
+    <div id="edit-slot-modal" class="modal-overlay hidden">
+        <div class="modal-card glass-card">
+            <h3>Rename Parking Slot</h3>
+            <p>Modify the identification for the selected parking slot below:</p>
+            <input type="hidden" id="edit-slot-id">
+            <div class="input-group">
+                <label for="edit-slot-name">Slot Name</label>
+                <input type="text" id="edit-slot-name" placeholder="e.g. VIP 1">
+            </div>
+            <div class="modal-actions">
+                <button class="secondary-btn" onclick="closeEditModal()">Cancel</button>
+                <button id="save-rename-btn" class="primary-btn" onclick="saveSlotRename()">Save Name</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Confirmation Dialog Modal -->
+    <div id="payment-modal" class="modal-overlay hidden">
+        <div class="modal-card glass-card payment-modal-card">
+            <div class="payment-modal-header">
+                <i class="fa-solid fa-receipt payment-icon"></i>
+                <h3>Parking Checkout Payment</h3>
+            </div>
+            <div class="payment-details-summary">
+                <input type="hidden" id="payment-transaction-id">
+                <div class="detail-row">
+                    <span class="detail-label">Vehicle Plate:</span>
+                    <span id="payment-vehicle-plate" class="detail-value">-</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Assigned Slot:</span>
+                    <span id="payment-slot-name" class="detail-value">-</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Duration:</span>
+                    <span id="payment-duration" class="detail-value">-</span>
+                </div>
+                <div class="detail-row total-fee-row">
+                    <span class="detail-label">Total Fee Due:</span>
+                    <span id="payment-total-fee" class="detail-value highlight-amount">₹0.00</span>
+                </div>
+            </div>
+            
+            <div class="payment-method-selection">
+                <h4>Select Payment Method</h4>
+                <div class="payment-methods-grid">
+                    <button id="btn-pay-cash" class="pay-method-btn active" onclick="selectPaymentMethod('CASH')">
+                        <i class="fa-solid fa-money-bill-wave"></i> Cash
+                    </button>
+                    <button id="btn-pay-card" class="pay-method-btn" onclick="selectPaymentMethod('CARD')">
+                        <i class="fa-solid fa-credit-card"></i> Card
+                    </button>
+                    <button id="btn-pay-upi" class="pay-method-btn" onclick="selectPaymentMethod('UPI')">
+                        <i class="fa-solid fa-mobile-screen-button"></i> UPI
+                    </button>
+                    <button id="btn-pay-stripe" class="pay-method-btn stripe-method-btn" onclick="selectPaymentMethod('STRIPE')">
+                        <i class="fa-brands fa-stripe-s"></i> Online (Stripe)
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Payment Action Area (Conditional reference fields) -->
+            <div id="payment-ref-group" class="input-group hidden">
+                <label for="payment-ref-input" id="payment-ref-label">Reference / Transaction ID</label>
+                <input type="text" id="payment-ref-input" placeholder="Enter transaction or receipt code">
+            </div>
+
+            <!-- Stripe payment form container if online selected -->
+            <div id="stripe-container" class="hidden">
+                <div id="card-element" class="glass-input" style="padding: 12px; margin-top: 10px;"><!-- Stripe card details will load here --></div>
+                <div id="card-errors" class="card-errors" role="alert" style="color: #ff5e5e; font-size: 0.85rem; margin-top: 5px;"></div>
+            </div>
+
+            <div id="payment-status-text" class="payment-status-message" style="margin-top: 10px; font-weight: 500; font-size: 0.9rem; text-align: center;"></div>
+
+            <div class="modal-actions" style="margin-top: 20px;">
+                <button class="secondary-btn" onclick="closePaymentModal()">Skip / Cancel</button>
+                <button id="confirm-payment-submit-btn" class="primary-btn" onclick="submitConfirmPayment()">
+                    <i class="fa-solid fa-check"></i> Complete Checkout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Glassmorphic Login modal overlay -->
+    <div id="login-modal" class="modal-overlay">
+        <div class="modal-card glass-card login-card">
+            <div class="login-header">
+                <i class="fa-solid fa-lock login-logo"></i>
+                <h3>SPARK Authentication</h3>
+                <p>Please enter your credentials to access the dashboard.</p>
+            </div>
+            <form id="login-form" onsubmit="handleLoginSubmit(event)">
+                <div class="input-group">
+                    <label for="login-username">Username</label>
+                    <input type="text" id="login-username" placeholder="e.g. admin or operator" required>
+                </div>
+                <div class="input-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" placeholder="••••••••" required>
+                </div>
+                <div id="login-error-msg" class="feedback-msg error hidden"></div>
+                <button type="submit" id="login-submit-btn" class="primary-btn btn-full">
+                    <i class="fa-solid fa-right-to-sign"></i> Log In
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- CDNs for Stripe & Chart.js -->
+    <script src="https://js.stripe.com/v3/"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Local Premium Javascript logic -->
+    <script src="app.js"></script>
+</body>
+</html>

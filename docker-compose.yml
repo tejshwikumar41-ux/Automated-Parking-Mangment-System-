@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - parking_data:/data
+    environment:
+      - DB_FILE=/data/parking.db
+      - PARKING_API_KEY=secret_parking_key_2026
+    restart: unless-stopped
+
+volumes:
+  parking_data:
