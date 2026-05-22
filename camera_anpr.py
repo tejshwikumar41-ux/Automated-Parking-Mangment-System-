@@ -27,6 +27,13 @@ import random
 import threading
 from datetime import datetime
 
+# Load local .env variables if python-dotenv is installed
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 # Try to import EasyOCR, handle ImportError gracefully with demo fallback
 try:
     import easyocr
@@ -39,8 +46,8 @@ except ImportError:
     print("[WARNING] To enable real OCR, run: pip install easyocr numpy opencv-python requests")
 
 # Configuration
-API_URL_ENTRY = "http://127.0.0.1:8000/api/entry"
-API_URL_EXIT = "http://127.0.0.1:8000/api/exit"
+API_URL_ENTRY = "https://automated-parking-mangment-system.onrender.com/api/entry"
+API_URL_EXIT = "https://automated-parking-mangment-system.onrender.com/api/exit"
 API_KEY = os.getenv("PARKING_API_KEY", "secret_parking_key_2026")
 QUEUE_FILE = "offline_queue.json"
 queue_lock = threading.Lock()
