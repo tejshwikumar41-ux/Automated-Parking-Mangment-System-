@@ -1,33 +1,30 @@
-# Builder Stage
-FROM python:3.12-slim AS builder
+FROM python:3.12-slim
 
 WORKDIR /app
 
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Install python dependencies globally
 COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Runner Stage
-FROM python:3.12-slim AS runner
+# Copy application files
+COPY . .
 
-WORKDIR /app
+# Create a data directory for SQLite persistence and make it writable by any user
+RUN mkdir -p /data && chmod 777 /data
 
-# Copy installed python packages from builder
-COPY --from=builder /root/.local /root/.local
-COPY . /app
-
-# Create a data directory for SQLite persistence
-RUN mkdir -p /data
-
-# Ensure local bin is on PATH (for uvicorn etc)
-ENV PATH=/root/.local/bin:$PATH
-ENV PYTHONUNBUFFERED=1
+# Default environment variables
 ENV DB_FILE=/data/parking.db
+ENV PORT=8000
+ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8000
 
-# Run FastAPI server
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]
+# Start server using the dynamic PORT env variable passed by Render
+CMD ["sh", "-c", "uvicorn server:app --host 0.0.0.0 --port ${PORT}"]
+
