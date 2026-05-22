@@ -431,7 +431,11 @@ class PaymentRequest(BaseModel):
     license_plate: str
     amount: float
 
-# --- REST ENDPOINTS ---
+from fastapi.responses import RedirectResponse
+
+@app.get("/")
+async def root_redirect():
+    return RedirectResponse(url="/static/index.html")
 
 # 1. Health Probe Check
 @app.get("/health")
